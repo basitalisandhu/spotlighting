@@ -1,0 +1,19 @@
+# Phrases that read as instructions to drop earlier instructions or take over a model.
+# tests/test_repo.py fails if any file in the repository, other than this one, contains
+# one of them (case-insensitive). Test inputs in this project are neutral sentences.
+ignore previous instructions
+ignore all previous instructions
+ignore the above instructions
+ignore prior instructions
+disregard previous instructions
+disregard all prior instructions
+disregard the above
+forget your instructions
+forget all previous instructions
+override your system prompt
+reveal your system prompt
+print your system prompt
+new system prompt:
+you are now in developer mode
+developer mode enabled
+do anything now

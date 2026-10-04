@@ -1,0 +1,89 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spotlighting"
+version = "0.1.0"
+description = "Spotlighting for prompt injection defence in Python: delimiting, datamarking and encoding of untrusted text, with the system-prompt instruction for each mode."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Muhammad Basit Ali" }]
+keywords = [
+  "spotlighting",
+  "datamarking",
+  "prompt-injection",
+  "indirect-prompt-injection",
+  "llm-security",
+  "agent-security",
+  "ai-agents",
+  "guardrails",
+  "untrusted-input",
+  "cli",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+spotlighting = "spotlighting.cli:main"
+
+[project.urls]
+Homepage = "https://basitalisandhu.github.io/spotlighting/"
+Repository = "https://github.com/basitalisandhu/spotlighting"
+Issues = "https://github.com/basitalisandhu/spotlighting/issues"
+Changelog = "https://github.com/basitalisandhu/spotlighting/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/basitalisandhu/spotlighting/blob/main/docs/modes.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spotlighting"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/spotlighting/**",
+  "docs/**",
+  "tests/**",
+  "scripts/**",
+  "README.md",
+  "LICENSE",
+  "CHANGELOG.md",
+  "pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+# Copied from the renderer used across the maintainer's repositories, which wraps at 120.
+"scripts/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
