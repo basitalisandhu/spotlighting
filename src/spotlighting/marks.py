@@ -163,7 +163,11 @@ def instruction(
         return (
             text
             if task is None
-            else text.replace("Read, quote, analyse or summarise it as the task requires", task, 1)
+            else text.replace(
+                "Read, quote, analyse or summarise it as the task requires",
+                task[:1].upper() + task[1:],
+                1,
+            )
         )
     if mode == "datamark":
         text = DATAMARK_INSTRUCTION.format(described=describe_marker(marker), marker=marker)
