@@ -36,7 +36,7 @@ from .marks import (
 from .pipeline import Pipeline, PipelineResult
 from .sources import for_email, for_fetched_page, for_tool_result, header_value, html_to_text
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "AUTO_MARKERS",

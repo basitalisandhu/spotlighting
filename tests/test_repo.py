@@ -71,7 +71,8 @@ def test_version_matches_pyproject() -> None:
 
 def test_changelog_has_current_version() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [{spotlighting.__version__}] - 2026-10-04" in changelog
+    heading = rf"^## \[{re.escape(spotlighting.__version__)}\] - \d{{4}}-\d{{2}}-\d{{2}}$"
+    assert re.search(heading, changelog, re.M)
 
 
 def test_py_typed_present() -> None:

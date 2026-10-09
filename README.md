@@ -34,17 +34,17 @@ pip install spotlighting
 Container image for the CLI: each release tag publishes `ghcr.io/basitalisandhu/spotlighting` for linux/amd64 and linux/arm64 (runs as uid 1000, working directory `/work`):
 
 ```bash
-echo "The build passed on all platforms." | docker run --rm -i ghcr.io/basitalisandhu/spotlighting:0.1.0 mark --mode datamark
-docker run --rm -v "$PWD:/work:ro" ghcr.io/basitalisandhu/spotlighting:0.1.0 mark --mode encode page.txt
+echo "The build passed on all platforms." | docker run --rm -i ghcr.io/basitalisandhu/spotlighting:0.2.0 mark --mode datamark
+docker run --rm -v "$PWD:/work:ro" ghcr.io/basitalisandhu/spotlighting:0.2.0 mark --mode encode page.txt
 ```
 
 The image is signed with a keyless cosign signature and carries a build provenance attestation and an SPDX SBOM (attached to the GitHub Release):
 
 ```bash
-cosign verify ghcr.io/basitalisandhu/spotlighting:0.1.0 \
+cosign verify ghcr.io/basitalisandhu/spotlighting:0.2.0 \
   --certificate-identity-regexp '^https://github.com/basitalisandhu/spotlighting/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/basitalisandhu/spotlighting:0.1.0 --repo basitalisandhu/spotlighting
+gh attestation verify oci://ghcr.io/basitalisandhu/spotlighting:0.2.0 --repo basitalisandhu/spotlighting
 ```
 
 ## Quickstart

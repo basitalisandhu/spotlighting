@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-09
+
 ### Added
 
 - `task` option on `instruction`, `delimit`, `datamark`, `encode` and `spotlight` to name the application's task in the instruction; default output unchanged.
@@ -24,5 +26,6 @@ All notable changes to this project are documented here. The format follows
 - Container image `ghcr.io/basitalisandhu/spotlighting` for linux/amd64 and linux/arm64, published on version tags with an SPDX SBOM, a build provenance attestation and a keyless cosign signature; runs as uid 1000.
 - CI on Python 3.11 and 3.12 with SHA-pinned actions, PyPI trusted publishing on tags (off until the repository variable `PYPI_PUBLISH` is set), `docs/demo.svg` rendered from `spotlighting demo`.
 
-[Unreleased]: https://github.com/basitalisandhu/spotlighting/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/basitalisandhu/spotlighting/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/basitalisandhu/spotlighting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/basitalisandhu/spotlighting/releases/tag/v0.1.0

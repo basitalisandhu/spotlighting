@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spotlighting"
-version = "0.1.0"
+version = "0.2.0"
 description = "Spotlighting for prompt injection defence in Python: delimiting, datamarking and encoding of untrusted text, with the system-prompt instruction for each mode."
 readme = "README.md"
 requires-python = ">=3.11"
