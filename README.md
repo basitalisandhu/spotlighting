@@ -60,6 +60,13 @@ original = result.unmark()  # the exact original text, for display or logs
 
 `result.text` is the marked text, `result.instruction` the sentence for the system prompt, and `result.provenance` a one-line header (`source: tool search`).
 
+For a specific application task, pass trusted wording such as
+`spotlight(text, task="translate it")` or `instruction("encode", task="translate it")`.
+The same keyword is available on `delimit`, `datamark` and `encode`.
+It changes the task clause, not the transformed text or its untrusted-data restrictions.
+Keep this option in trusted application configuration, not in retrieved content.
+Omitting it (or passing `None`) preserves the default output exactly.
+
 From the shell:
 
 ```bash

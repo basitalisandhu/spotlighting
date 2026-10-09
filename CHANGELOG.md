@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `task` option on `instruction`, `delimit`, `datamark`, `encode` and `spotlight` to name the application's task in the instruction; default output unchanged.
+
 ## [0.1.0] - 2026-10-04
 
 ### Added

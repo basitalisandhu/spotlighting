@@ -153,16 +153,32 @@ def instruction(
     marker: str = DEFAULT_MARKER,
     scheme: Scheme = "base64",
     skip_code: bool = False,
+    task: str | None = None,
 ) -> str:
-    """The system-prompt instruction that goes with a mode and its options."""
+    """The mode instruction, with optional trusted application task wording."""
+    if task is not None and not task.strip():
+        raise SpotlightError("task must not be empty")
     if mode == "delimit":
-        return DELIMIT_INSTRUCTION.format(start=start, end=end)
+        text = DELIMIT_INSTRUCTION.format(start=start, end=end)
+        return (
+            text
+            if task is None
+            else text.replace(
+                "Read, quote, analyse or summarise it as the task requires",
+                task[:1].upper() + task[1:],
+                1,
+            )
+        )
     if mode == "datamark":
         text = DATAMARK_INSTRUCTION.format(described=describe_marker(marker), marker=marker)
+        if task is not None:
+            clause = f"Read it as if each {marker} were a space"
+            text = text.replace(clause, f"{clause} and {task}", 1)
         return text + DATAMARK_CODE_NOTE if skip_code else text
     if mode == "encode":
         _check_scheme(scheme)
-        return ENCODE_INSTRUCTION.format(description=SCHEME_DESCRIPTIONS[scheme])
+        text = ENCODE_INSTRUCTION.format(description=SCHEME_DESCRIPTIONS[scheme])
+        return text if task is None else text.replace("use it as the task requires", task, 1)
     raise SpotlightError(f"unknown mode {mode!r}; expected one of {', '.join(MODES)}")
 
 
@@ -185,6 +201,7 @@ def delimit(
     start: str = DEFAULT_START,
     end: str = DEFAULT_END,
     on_collision: Collision = "error",
+    task: str | None = None,
 ) -> Spotlighted:
     """Wrap untrusted text in a start and an end delimiter.
 
@@ -211,7 +228,7 @@ def delimit(
         )
     return Spotlighted(
         text=f"{start}{text}{end}",
-        instruction=instruction("delimit", start=start, end=end),
+        instruction=instruction("delimit", start=start, end=end, task=task),
         mode="delimit",
         marker=start,
         end=end,
@@ -326,6 +343,7 @@ def datamark(
     marker: str = DEFAULT_MARKER,
     skip_code: bool = False,
     on_collision: Literal["error", "auto"] = "error",
+    task: str | None = None,
 ) -> Spotlighted:
     """Interleave a marker through untrusted text, as the paper's datamarking does.
 
@@ -352,7 +370,7 @@ def datamark(
         )
     return Spotlighted(
         text=marked,
-        instruction=instruction("datamark", marker=marker, skip_code=skip_code),
+        instruction=instruction("datamark", marker=marker, skip_code=skip_code, task=task),
         mode="datamark",
         marker=marker,
         skip_code=skip_code,
@@ -384,7 +402,7 @@ def _encode_text(text: str, scheme: Scheme) -> str:
     return data.hex()
 
 
-def encode(text: str, scheme: Scheme = "base64") -> Spotlighted:
+def encode(text: str, scheme: Scheme = "base64", *, task: str | None = None) -> Spotlighted:
     """Encode untrusted text with base64, ROT13 or hex.
 
     The paper reports that encoding costs task quality on lower-capacity models; see the
@@ -392,7 +410,7 @@ def encode(text: str, scheme: Scheme = "base64") -> Spotlighted:
     """
     return Spotlighted(
         text=_encode_text(text, scheme),
-        instruction=instruction("encode", scheme=scheme),
+        instruction=instruction("encode", scheme=scheme, task=task),
         mode="encode",
         marker=scheme,
         original_length=len(text),
@@ -427,6 +445,7 @@ def spotlight(
     scheme: Scheme = "base64",
     skip_code: bool = False,
     on_collision: str | None = None,
+    task: str | None = None,
 ) -> Spotlighted:
     """Spotlight untrusted text with one of the three modes.
 
@@ -434,16 +453,17 @@ def spotlight(
     ``"error"`` and accepts the values of the mode's own function.
     """
     if mode == "delimit":
-        return delimit(text, start=start, end=end, on_collision=on_collision or "error")  # type: ignore[arg-type]
+        return delimit(text, start=start, end=end, on_collision=on_collision or "error", task=task)  # type: ignore[arg-type]
     if mode == "datamark":
         return datamark(
             text,
             marker=marker,
             skip_code=skip_code,
             on_collision=on_collision or "error",  # type: ignore[arg-type]
+            task=task,
         )
     if mode == "encode":
-        return encode(text, scheme)
+        return encode(text, scheme, task=task)
     raise SpotlightError(f"unknown mode {mode!r}; expected one of {', '.join(MODES)}")
 
 
