@@ -189,3 +189,23 @@ def test_module_entry_point_subprocess() -> None:
         check=False,
     )
     assert proc.returncode == 0 and proc.stdout == b"alpha^beta^\n"
+
+
+@pytest.mark.parametrize("mode", ["delimit", "datamark", "encode"])
+def test_mark_with_instruction_prints_instruction_blank_line_then_text(
+    mode, monkeypatch, capsys
+) -> None:
+    _, plain, _ = run(monkeypatch, capsys, ["mark", "--mode", mode], "one two\n")
+    _, instr, _ = run(monkeypatch, capsys, ["instruction", "--mode", mode])
+    code, out, _ = run(
+        monkeypatch, capsys, ["mark", "--mode", mode, "--with-instruction"], "one two\n"
+    )
+    assert code == 0
+    assert out == instr.rstrip("\n") + "\n\n" + plain
+
+
+def test_mark_with_instruction_json_is_unchanged(monkeypatch, capsys) -> None:
+    argv = ["mark", "--mode", "datamark", "--format", "json"]
+    _, plain, _ = run(monkeypatch, capsys, argv, "one two\n")
+    code, out, _ = run(monkeypatch, capsys, [*argv, "--with-instruction"], "one two\n")
+    assert code == 0 and out == plain
