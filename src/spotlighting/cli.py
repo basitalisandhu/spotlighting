@@ -114,6 +114,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="when the text contains the marker or a delimiter (delimit: error, allow, tag; "
         "datamark: error, auto)",
     )  # fmt: skip
+    mark.add_argument(
+        "--with-instruction", action="store_true",
+        help="text output: print the instruction, one blank line, then the marked text "
+        "(json output always includes the instruction)",
+    )  # fmt: skip
     mark.add_argument("file", nargs="?", help="input file (default: stdin)")
 
     unmark = sub.add_parser(
@@ -161,7 +166,8 @@ def _cmd_mark(args: argparse.Namespace) -> int:
     if args.format == "json":
         _dump(_as_json(result))
     else:
-        _write(result.text if args.mode == "datamark" else result.text + "\n")
+        prefix = result.instruction + "\n\n" if args.with_instruction else ""
+        _write(prefix + (result.text if args.mode == "datamark" else result.text + "\n"))
     return EXIT_OK
 
 

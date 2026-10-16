@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-16
+
+### Added
+
+- `spotlighting mark --with-instruction` prints the instruction, one blank line, then the marked text, so one command gives both (#1).
+- Property-based round-trip tests (Hypothesis) for every mode, the automatic marker, fenced code, `Pipeline.restore()` and lone surrogates.
+
+### Fixed
+
+- `encode` with base64 or hex raised `UnicodeEncodeError` on text containing a lone surrogate (for example text decoded with `errors="surrogateescape"` or JSON with an unpaired `\ud800` escape). Encoding and decoding now use `surrogatepass`, so the round trip is exact.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added

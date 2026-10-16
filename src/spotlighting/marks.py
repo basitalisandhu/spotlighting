@@ -396,7 +396,9 @@ def _encode_text(text: str, scheme: Scheme) -> str:
     _check_scheme(scheme)
     if scheme == "rot13":
         return codecs.encode(text, "rot13")
-    data = text.encode("utf-8")
+    # surrogatepass keeps the round trip exact for lone surrogates (text decoded with
+    # errors="surrogateescape", or JSON with unpaired \ud800 escapes) instead of crashing.
+    data = text.encode("utf-8", "surrogatepass")
     if scheme == "base64":
         return base64.b64encode(data).decode("ascii")
     return data.hex()
@@ -427,7 +429,7 @@ def decode(text: str, scheme: Scheme = "base64") -> str:
             data = base64.b64decode("".join(text.split()), validate=True)
         else:
             data = bytes.fromhex("".join(text.split()))
-        return data.decode("utf-8")
+        return data.decode("utf-8", "surrogatepass")
     except (binascii.Error, ValueError) as exc:
         raise SpotlightError(f"not valid {scheme}: {exc}") from exc
 
