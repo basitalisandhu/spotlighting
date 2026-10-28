@@ -13,7 +13,7 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from . import __version__
+from . import __version__, _jsondepth
 from .marks import (
     DEFAULT_END,
     DEFAULT_MARKER,
@@ -59,7 +59,7 @@ def _read(path: str | None) -> str:
 
 def _load_json(raw: str, path: str | None, expected: str) -> Any:
     try:
-        return json.loads(raw)
+        return _jsondepth.loads(raw)
     except ValueError as exc:  # JSONDecodeError, and integers longer than Python reads
         raise _InputError(f"{_name(path)}: expected {expected}; not valid JSON: {exc}") from exc
     except RecursionError as exc:
