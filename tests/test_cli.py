@@ -209,3 +209,26 @@ def test_mark_with_instruction_json_is_unchanged(monkeypatch, capsys) -> None:
     _, plain, _ = run(monkeypatch, capsys, argv, "one two\n")
     code, out, _ = run(monkeypatch, capsys, [*argv, "--with-instruction"], "one two\n")
     assert code == 0 and out == plain
+
+
+@pytest.mark.parametrize("mode", ["datamark", "delimit", "encode"])
+def test_mark_json_round_trip(mode, monkeypatch, capsys) -> None:
+    doc = {
+        "id": "a1",
+        "meta": {"source": "search"},
+        "hits": [{"id": "b2", "body": "Meeting moved to 3pm.\r\nBring the agenda ^"}],
+        "count": 1,
+    }
+    argv = ["mark-json", "--mode", mode, "--trusted-key", "id", "--trusted-path", "meta.source"]
+    code, out, _ = run(monkeypatch, capsys, argv, json.dumps(doc))
+    marked = json.loads(out)
+    assert code == 0 and marked["paths"] == ["hits.*.body"] and marked["mode"] == mode
+    assert marked["value"]["id"] == "a1" and marked["value"]["meta"]["source"] == "search"
+    assert marked["value"]["hits"][0]["body"] != doc["hits"][0]["body"]
+    code, restored, _ = run(monkeypatch, capsys, ["unmark-json"], out)
+    assert code == 0 and json.loads(restored) == doc
+
+
+def test_mark_json_picks_a_free_marker(monkeypatch, capsys) -> None:
+    code, out, _ = run(monkeypatch, capsys, ["mark-json"], '["a ^ b", "c d"]')
+    assert code == 0 and json.loads(out)["marker"] == chr(0x02C6)

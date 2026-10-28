@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
+### Added
+
+- `spotlighting mark-json` marks every untrusted string in a JSON document from the shell, with `--trusted-key` and `--trusted-path` allowlists, one instruction for the whole document and the marked paths; `spotlighting unmark-json` reverses it.
+- Troubleshooting section in the README with the real error messages and their fixes.
+- Seeded, time-bounded fuzz tests over every command's input reader, scaling tests (ten times the input, held near linear) and an end-to-end test that installs the built wheel in a fresh venv and runs the README quick start, in CI.
+
+### Fixed
+
+- `unmark --format json` crashed with a traceback on JSON with the wrong types (a number for `text`, a list for `marker`), on `NaN`, and on very deeply nested input. It now exits 2 with a message that names the file or `stdin`.
+- `Pipeline.apply` and `PipelineResult.restore` hit `RecursionError` on structures nested thousands of levels deep and on a list that contains itself; they now raise `SpotlightError`. Shared, non-cyclic sub-structures still work.
+- `spotlighting instruction --mode datamark --marker ""` printed an instruction for an empty marker; it now exits 1 like `mark`.
+- A lone surrogate in `unmark` output ended in a `UnicodeEncodeError` traceback; it is now a one-line error with exit 1.
+- Non-UTF-8 input errors now name the file.
+
 ## [0.3.0] - 2026-10-16
 
 ### Added

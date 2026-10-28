@@ -27,6 +27,9 @@ from .marks import (
     unmark_text,
 )
 
+# Deeper structures are refused with a SpotlightError instead of exhausting the stack.
+MAX_DEPTH = 200
+
 
 def _path(parent: str, part: str | int) -> str:
     if isinstance(part, int):
@@ -66,26 +69,42 @@ def _map(
     trusted_paths: frozenset[str],
     path: str,
     seen: list[str],
+    depth: int = 0,
+    active: set[int] | None = None,
 ) -> Any:
     if isinstance(value, str):
         seen.append(path or "$")
         return fn(value)
-    if isinstance(value, dict):
-        out: dict[Any, Any] = {}
-        for key, item in value.items():
-            child = _path(path, str(key))
-            if str(key) in trusted_keys or child in trusted_paths:
-                out[key] = item
-            else:
-                out[key] = _map(item, fn, trusted_keys, trusted_paths, child, seen)
-        return out
-    if isinstance(value, list | tuple):
+    if not isinstance(value, dict | list | tuple):
+        return value
+    if depth >= MAX_DEPTH:
+        raise SpotlightError(f"structure is nested more than {MAX_DEPTH} levels deep")
+    active = set() if active is None else active
+    if id(value) in active:
+        raise SpotlightError(f"structure contains itself at {path or '$'}")
+    active.add(id(value))
+    try:
+        if isinstance(value, dict):
+            out: dict[Any, Any] = {}
+            for key, item in value.items():
+                child = _path(path, str(key))
+                if str(key) in trusted_keys or child in trusted_paths:
+                    out[key] = item
+                else:
+                    out[key] = _map(
+                        item, fn, trusted_keys, trusted_paths, child, seen, depth + 1, active
+                    )
+            return out
         child = _path(path, 0)
         if child in trusted_paths:
             return value
-        items = [_map(item, fn, trusted_keys, trusted_paths, child, seen) for item in value]
+        items = [
+            _map(item, fn, trusted_keys, trusted_paths, child, seen, depth + 1, active)
+            for item in value
+        ]
         return items if isinstance(value, list) else tuple(items)
-    return value
+    finally:
+        active.discard(id(value))
 
 
 def _strings(value: Any, trusted_keys: frozenset[str], trusted_paths: frozenset[str]) -> list[str]:
