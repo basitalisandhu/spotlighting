@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-29
+
+### Fixed
+
+- Deeply nested JSON input is refused with the same "nested too deeply" error on every supported Python. Python 3.14 no longer raises `RecursionError` from `json.loads` at the old depth, so input is now checked for nesting first (limit 200 levels) instead of relying on it.
+- CI tests Python 3.11 to 3.14.
+
 ## [0.4.0] - 2026-10-28
 
 ### Added
@@ -53,6 +60,7 @@ All notable changes to this project are documented here. The format follows
 - Container image `ghcr.io/basitalisandhu/spotlighting` for linux/amd64 and linux/arm64, published on version tags with an SPDX SBOM, a build provenance attestation and a keyless cosign signature; runs as uid 1000.
 - CI on Python 3.11 and 3.12 with SHA-pinned actions, PyPI trusted publishing on tags (off until the repository variable `PYPI_PUBLISH` is set), `docs/demo.svg` rendered from `spotlighting demo`.
 
-[Unreleased]: https://github.com/basitalisandhu/spotlighting/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/basitalisandhu/spotlighting/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/basitalisandhu/spotlighting/compare/v0.4.0...v0.4.1
 [0.2.0]: https://github.com/basitalisandhu/spotlighting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/basitalisandhu/spotlighting/releases/tag/v0.1.0
