@@ -1,7 +1,7 @@
-"""The `spotlighting` command: mark, unmark, print instructions, and a demo.
+"""The `spotlighting` command: mark, unmark, mark JSON, print instructions, and a demo.
 
 Exit codes: 0 success, 1 the text could not be marked or unmarked (for example a marker
-collision or invalid base64), 2 usage errors and unreadable input.
+collision or invalid base64), 2 usage errors and unreadable or malformed input.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from .marks import (
     spotlight,
     unmark_text,
 )
+from .pipeline import Pipeline, PipelineResult
 
 EXIT_OK = 0
 EXIT_FAILED = 1
@@ -41,6 +42,10 @@ class _InputError(Exception):
     pass
 
 
+def _name(path: str | None) -> str:
+    return "stdin" if path in (None, "-") else str(path)
+
+
 def _read(path: str | None) -> str:
     try:
         data = sys.stdin.buffer.read() if path in (None, "-") else Path(path).read_bytes()  # type: ignore[arg-type]
@@ -49,7 +54,34 @@ def _read(path: str | None) -> str:
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise _InputError(f"input is not valid UTF-8: {exc}") from exc
+        raise _InputError(f"{_name(path)}: input is not valid UTF-8: {exc}") from exc
+
+
+def _load_json(raw: str, path: str | None, expected: str) -> Any:
+    try:
+        return json.loads(raw)
+    except ValueError as exc:  # JSONDecodeError, and integers longer than Python reads
+        raise _InputError(f"{_name(path)}: expected {expected}; not valid JSON: {exc}") from exc
+    except RecursionError as exc:
+        raise _InputError(f"{_name(path)}: expected {expected}; nested too deeply to read") from exc
+
+
+def _field(
+    doc: dict[str, Any],
+    key: str,
+    path: str | None,
+    *,
+    optional: bool = False,
+    printer: str = "mark --format json",
+) -> Any:
+    value = doc.get(key)
+    if value is None and optional:
+        return None
+    if not isinstance(value, str):
+        raise _InputError(
+            f"{_name(path)}: expected the JSON printed by `{printer}`: {key!r} must be a string"
+        )
+    return value
 
 
 def _write(text: str) -> None:
@@ -137,6 +169,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_mode_options(instr)
 
+    mjson = sub.add_parser(
+        "mark-json",
+        help="spotlight every untrusted string in a JSON document",
+        description="Read a JSON document (a tool result, search hits) from FILE or stdin and "
+        "spotlight every string value except trusted ones. Prints JSON with the marked value, "
+        "one instruction for the whole document and the settings `unmark-json` needs.",
+    )
+    mjson.add_argument(
+        "--mode", choices=MODES, default="datamark", help="delimit, datamark (default) or encode"
+    )
+    mjson.add_argument(
+        "--trusted-key", action="append", default=[], metavar="KEY",
+        help="leave values under this key unmarked, anywhere in the document (repeatable)",
+    )  # fmt: skip
+    mjson.add_argument(
+        "--trusted-path", action="append", default=[], metavar="PATH",
+        help="leave the value at this dotted path unmarked; * matches any list index (repeatable)",
+    )  # fmt: skip
+    mjson.add_argument(
+        "--marker", default="auto",
+        help="datamark marker (default 'auto': one that no untrusted string contains)",
+    )  # fmt: skip
+    mjson.add_argument("--start", default=DEFAULT_START, help="delimit start delimiter")
+    mjson.add_argument("--end", default=DEFAULT_END, help="delimit end delimiter")
+    mjson.add_argument("--scheme", choices=SCHEMES, default="base64", help="encode scheme")
+    mjson.add_argument(
+        "--skip-code", action="store_true", help="datamark: leave fenced code blocks unmarked"
+    )
+    mjson.add_argument("file", nargs="?", help="input JSON file (default: stdin)")
+
+    ujson = sub.add_parser(
+        "unmark-json",
+        help="recover the original JSON document from mark-json output",
+        description="Reverse `mark-json`: read its JSON output and print the original document.",
+    )
+    ujson.add_argument("file", nargs="?", help="mark-json output (default: stdin)")
+
     demo = sub.add_parser(
         "demo",
         help="show the three modes on a neutral sample paragraph",
@@ -174,13 +243,15 @@ def _cmd_mark(args: argparse.Namespace) -> int:
 def _cmd_unmark(args: argparse.Namespace) -> int:
     raw = _read(args.file)
     if args.format == "json":
-        try:
-            doc = json.loads(raw)
-            mode, text = doc["mode"], doc["text"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            raise _InputError(f"expected the JSON printed by `mark --format json`: {exc}") from exc
+        doc = _load_json(raw, args.file, "the JSON printed by `mark --format json`")
+        if not isinstance(doc, dict):
+            raise _InputError(
+                f"{_name(args.file)}: expected the JSON object printed by `mark --format json`"
+            )
+        mode, text = _field(doc, "mode", args.file), _field(doc, "text", args.file)
         original = unmark_text(
-            text, mode, marker=doc.get("marker"), end=doc.get("end"),
+            text, mode, marker=_field(doc, "marker", args.file, optional=True),
+            end=_field(doc, "end", args.file, optional=True),
             skip_code=bool(doc.get("skip_code")),
         )  # fmt: skip
         _write(original)
@@ -198,6 +269,11 @@ def _cmd_unmark(args: argparse.Namespace) -> int:
 
 def _cmd_instruction(args: argparse.Namespace) -> int:
     marker = DEFAULT_MARKER if args.marker == "auto" else args.marker
+    if args.mode == "datamark":
+        if not marker:
+            raise SpotlightError("the marker must not be empty")
+        if any(ch.isspace() for ch in marker):
+            raise SpotlightError("the marker must not contain whitespace")
     text = instruction(
         args.mode, start=args.start, end=args.end, marker=marker, scheme=args.scheme,
         skip_code=args.skip_code,
@@ -206,6 +282,60 @@ def _cmd_instruction(args: argparse.Namespace) -> int:
         _dump({"mode": args.mode, "instruction": text})
     else:
         _write(text + "\n")
+    return EXIT_OK
+
+
+def _cmd_mark_json(args: argparse.Namespace) -> int:
+    value = _load_json(_read(args.file), args.file, "a JSON document")
+    result = Pipeline(
+        args.mode,
+        trusted_keys=args.trusted_key,
+        trusted_paths=args.trusted_path,
+        marker=args.marker,
+        start=args.start,
+        end=args.end,
+        scheme=args.scheme,
+        skip_code=args.skip_code,
+    ).apply(value)
+    _dump(
+        {
+            "mode": result.mode,
+            "marker": result.marker,
+            "end": result.end,
+            "skip_code": result.skip_code,
+            "trusted_keys": sorted(result.trusted_keys),
+            "trusted_paths": sorted(result.trusted_paths),
+            "instruction": result.instruction,
+            "paths": list(result.paths),
+            "value": result.value,
+        }
+    )
+    return EXIT_OK
+
+
+def _cmd_unmark_json(args: argparse.Namespace) -> int:
+    doc = _load_json(_read(args.file), args.file, "the JSON printed by `mark-json`")
+    bad = f"{_name(args.file)}: expected the JSON printed by `mark-json`"
+    if not isinstance(doc, dict) or "value" not in doc:
+        raise _InputError(bad)
+    keys, paths = doc.get("trusted_keys", []), doc.get("trusted_paths", [])
+    if not all(isinstance(v, list) and all(isinstance(x, str) for x in v) for v in (keys, paths)):
+        raise _InputError(f"{bad}: trusted_keys and trusted_paths must be lists of strings")
+    mode = _field(doc, "mode", args.file, printer="mark-json")
+    if mode not in MODES:
+        raise SpotlightError(f"unknown mode {mode!r}; expected one of {', '.join(MODES)}")
+    result = PipelineResult(
+        value=doc["value"],
+        instruction="",
+        mode=mode,  # type: ignore[arg-type]
+        marker=_field(doc, "marker", args.file, printer="mark-json"),
+        end=_field(doc, "end", args.file, optional=True, printer="mark-json"),
+        skip_code=bool(doc.get("skip_code")),
+        paths=(),
+        trusted_keys=frozenset(keys),
+        trusted_paths=frozenset(paths),
+    )
+    _dump(result.restore())
     return EXIT_OK
 
 
@@ -245,6 +375,8 @@ def main(argv: list[str] | None = None) -> int:
         "mark": _cmd_mark,
         "unmark": _cmd_unmark,
         "instruction": _cmd_instruction,
+        "mark-json": _cmd_mark_json,
+        "unmark-json": _cmd_unmark_json,
         "demo": _cmd_demo,
     }
     if args.command is None:
@@ -257,6 +389,13 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_USAGE
     except SpotlightError as exc:
         print(f"spotlighting: {exc}", file=sys.stderr)
+        return EXIT_FAILED
+    except UnicodeEncodeError as exc:
+        print(
+            f"spotlighting: the output contains a character that cannot be written as UTF-8 "
+            f"(a lone surrogate, position {exc.start})",
+            file=sys.stderr,
+        )
         return EXIT_FAILED
 
 

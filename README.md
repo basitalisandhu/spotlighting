@@ -45,17 +45,17 @@ pip install spotlighting
 Container image for the CLI: each release tag publishes `ghcr.io/basitalisandhu/spotlighting` for linux/amd64 and linux/arm64 (runs as uid 1000, working directory `/work`):
 
 ```bash
-echo "The build passed on all platforms." | docker run --rm -i ghcr.io/basitalisandhu/spotlighting:0.3.0 mark --mode datamark
-docker run --rm -v "$PWD:/work:ro" ghcr.io/basitalisandhu/spotlighting:0.3.0 mark --mode encode page.txt
+echo "The build passed on all platforms." | docker run --rm -i ghcr.io/basitalisandhu/spotlighting:0.4.0 mark --mode datamark
+docker run --rm -v "$PWD:/work:ro" ghcr.io/basitalisandhu/spotlighting:0.4.0 mark --mode encode page.txt
 ```
 
 The image is signed with a keyless cosign signature and carries a build provenance attestation and an SPDX SBOM (attached to the GitHub Release):
 
 ```bash
-cosign verify ghcr.io/basitalisandhu/spotlighting:0.3.0 \
+cosign verify ghcr.io/basitalisandhu/spotlighting:0.4.0 \
   --certificate-identity-regexp '^https://github.com/basitalisandhu/spotlighting/\.github/workflows/publish-github-packages\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/basitalisandhu/spotlighting:0.3.0 --repo basitalisandhu/spotlighting
+gh attestation verify oci://ghcr.io/basitalisandhu/spotlighting:0.4.0 --repo basitalisandhu/spotlighting
 ```
 
 ## Quickstart
@@ -84,6 +84,7 @@ From the shell:
 spotlighting mark --mode datamark notes.txt          # marked text on stdout
 spotlighting mark --mode encode --format json < page.txt   # marked text plus instruction as JSON
 spotlighting mark --mode datamark --with-instruction notes.txt  # instruction, a blank line, then the marked text
+spotlighting mark-json --trusted-key id hits.json   # mark every untrusted string in a JSON document
 spotlighting instruction --mode datamark             # just the system-prompt sentence
 spotlighting demo                                    # the three modes on a neutral paragraph
 ```
@@ -91,7 +92,7 @@ spotlighting demo                                    # the three modes on a neut
 ## When to use this
 
 - **How do I apply spotlighting or datamarking to tool output in Python?** `for_tool_result(name, content)` or `spotlight(text, mode="datamark")`; put `result.instruction` in the system prompt and `result.text` where the content goes.
-- **I put a whole JSON tool result into the prompt. How do I mark only the untrusted fields?** `Pipeline(trusted_keys={"id", "status"}).apply(result_dict)` marks every other string, picks one marker for the whole structure and returns one instruction.
+- **I put a whole JSON tool result into the prompt. How do I mark only the untrusted fields?** `Pipeline(trusted_keys={"id", "status"}).apply(result_dict)` marks every other string, picks one marker for the whole structure and returns one instruction. From the shell, `spotlighting mark-json --trusted-key id --trusted-key status result.json` does the same and `spotlighting unmark-json` reverses it.
 - **My agent reads web pages.** `for_fetched_page(url, html)` strips the page to its visible text with the standard library parser (scripts, styles, comments and elements hidden with `hidden`, `aria-hidden` or an inline `display: none` are dropped) and marks it. It makes no request; pass the HTML you already fetched.
 - **My agent reads email.** `for_email(subject, body, sender)` marks the subject together with the body, since both are written by the sender, and keeps the sender in a sanitised one-line header.
 - **Fenced code in documentation should stay readable.** `datamark(text, skip_code=True)` leaves ```` ``` ```` and `~~~` blocks unmarked and says so in the instruction.
@@ -140,11 +141,34 @@ spotlighting mark --mode delimit|datamark|encode [--marker X] [--start S --end E
                   [--scheme base64|hex|rot13] [--skip-code] [--on-collision ...]
                   [--format text|json] [FILE]
 spotlighting unmark --mode ... [same options] [FILE]     # or --format json with mark's JSON
+spotlighting mark-json [--mode ...] [--trusted-key KEY]... [--trusted-path PATH]...
+                       [--marker X|auto] [--start S --end E] [--scheme ...] [FILE]
+spotlighting unmark-json [FILE]                           # reverses mark-json
 spotlighting instruction --mode ... [options] [--format text|json]
 spotlighting demo [--format text|json]
 ```
 
-Input is FILE or stdin, read as UTF-8 bytes so CRLF line endings survive. Text output is the marked text only; for `delimit` and `encode` a final newline is added, and `unmark` removes it again. Exit codes: 0 success, 1 the text could not be marked or unmarked (a marker collision, invalid base64), 2 usage errors and unreadable or non-UTF-8 input. `--help` works on every command.
+`mark-json` reads a JSON document and prints JSON with the marked `value`, one `instruction` for the whole document, the `paths` that were marked and the settings `unmark-json` needs:
+
+```console
+$ echo '{"id": "a1", "hits": [{"id": "b2", "body": "Meeting moved to 3pm."}]}' | spotlighting mark-json --trusted-key id | jq -c '{paths, value}'
+{"paths":["hits.*.body"],"value":{"id":"a1","hits":[{"id":"b2","body":"Meeting^moved^to^3pm."}]}}
+```
+
+Input is FILE or stdin, read as UTF-8 bytes so CRLF line endings survive. Text output is the marked text only; for `delimit` and `encode` a final newline is added, and `unmark` removes it again. Exit codes: 0 success, 1 the text could not be marked or unmarked (a marker collision, invalid base64, a JSON document nested more than 200 levels deep), 2 usage errors and unreadable, non-UTF-8 or malformed input. Error messages name the file (or `stdin`). `--help` works on every command.
+
+## Troubleshooting
+
+| Message | Cause and fix |
+|---|---|
+| `spotlighting: the text already contains the marker '^'; ...` (exit 1) | The text already has a `^`, so the marking would be ambiguous. Pass `--marker auto` (or `--on-collision auto`) to pick a marker the text lacks, or choose a private-use character such as U+E000. |
+| `spotlighting: the text contains the delimiter '<<' or '>>'; ...` (exit 1) | With `--mode delimit` the text holds `<<` or `>>`. Use `--on-collision tag`, other `--start`/`--end` delimiters, or datamarking. |
+| `spotlighting: notes.txt: input is not valid UTF-8: ...` (exit 2) | The file is in another encoding (UTF-16 from Windows tools, Latin-1). Convert it first, for example `iconv -f UTF-16 -t UTF-8 notes.txt \| spotlighting mark --mode datamark`. |
+| `spotlighting: text is not wrapped in '<<' and '>>'` (exit 1) | `unmark --mode delimit` got text marked with other delimiters, or text whose first or last line was trimmed. Pass the same `--start`/`--end` as `mark`, or unmark the `--format json` output, which records them. |
+| `spotlighting: not valid base64: ...` (exit 1) | The encoded text was changed after marking (cut short, or a model's rewrite of it). Unmark the exact output of `mark`; line breaks and spaces inside base64 are ignored. |
+| `spotlighting: stdin: expected the JSON printed by ...` (exit 2) | `unmark --format json` reads only the JSON that `mark --format json` printed, with string `mode` and `text`. For other JSON documents use `mark-json` and `unmark-json`. |
+| `spotlighting: structure is nested more than 200 levels deep` (exit 1) | `mark-json` and `Pipeline` refuse very deep or self-containing structures rather than exhausting the stack. Flatten the document or mark the part that matters. |
+| `pipx: command not found` or `requires a different Python` | Install pipx (`python3 -m pip install --user pipx`), and use Python 3.11 or newer: `pipx install --python python3.12 git+https://github.com/basitalisandhu/spotlighting`. |
 
 ## What this is not
 
